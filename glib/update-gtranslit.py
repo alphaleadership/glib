@@ -134,51 +134,50 @@ class Chain:
         current_mapping = None
         in_lc_ctype = False
         in_translit = False
+        with open(filename, encoding='ascii', errors='surrogateescape') as fp:
 
-        fp = open(filename, encoding='ascii', errors='surrogateescape')
+            for line in fp:
+                line = line.strip()
 
-        for line in fp:
-            line = line.strip()
+                if in_lc_ctype:
+                    if line == 'END LC_CTYPE':
+                        break
 
-            if in_lc_ctype:
-                if line == 'END LC_CTYPE':
-                    break
+                    if line.startswith('copy') or line.startswith('include'):
+                        if current_mapping:
+                            self.chain.append(current_mapping)
 
-                if line.startswith('copy') or line.startswith('include'):
-                    if current_mapping:
-                        self.chain.append(current_mapping)
+                        copyname = unescape(line.split('"', 3)[1])
+                        copyfile = get_chain(copyname)
+                        self.chain.append(copyfile)
+                        copyfile.links += 1
 
-                    copyname = unescape(line.split('"', 3)[1])
-                    copyfile = get_chain(copyname)
-                    self.chain.append(copyfile)
-                    copyfile.links += 1
+                        current_mapping = None
 
-                    current_mapping = None
+                    elif line == 'translit_start':
+                        in_translit = True
 
-                elif line == 'translit_start':
-                    in_translit = True
+                    elif line == 'translit_end':
+                        in_translit = False
 
-                elif line == 'translit_end':
-                    in_translit = False
+                    elif in_translit and line.startswith('<U'):
+                        if not current_mapping:
+                            current_mapping = Mapping()
 
-                elif in_translit and line.startswith('<U'):
-                    if not current_mapping:
-                        current_mapping = Mapping()
+                        current_mapping.consider_mapping_line(line)
 
-                    current_mapping.consider_mapping_line(line)
+                    elif line == '' or line.startswith('%'):
+                        pass
 
-                elif line == '' or line.startswith('%'):
-                    pass
+                    elif 'default_missing <U003F>':
+                        pass
 
-                elif 'default_missing <U003F>':
-                    pass
+                    elif in_translit:
+                        print('unknown line:', line)
+                        assert False
 
-                elif in_translit:
-                    print('unknown line:', line)
-                    assert False
-
-            elif line == 'LC_CTYPE':
-                in_lc_ctype = True
+                elif line == 'LC_CTYPE':
+                    in_lc_ctype = True
 
         if current_mapping:
             self.chain.append(current_mapping)
